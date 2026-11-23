@@ -85,6 +85,33 @@ def build_m3u_content(disc_files: list[str]) -> str:
     return "\n".join(sorted_files) + "\n"
 
 
+# MSU-1: a SNES ROM beside its ``.msu`` data file and ``<name>-N.pcm`` audio tracks.
+_MSU1_ROM_EXTENSIONS = (".sfc", ".smc")
+
+
+def holds_msu1_set(member_names: list[str]) -> bool:
+    """Whether a single zip carries an MSU-1 set (a ``.msu`` beside a ``.sfc``/``.smc``).
+
+    RetroArch reads a single zip by extracting only the ROM it launches, so
+    the ``.msu`` and ``.pcm`` tracks beside it never reach the core and the game
+    plays without its MSU-1 audio. Such a zip is unpacked like a multi-file ROM.
+    """
+    lowered = [name.lower() for name in member_names if not name.endswith("/")]
+    return any(n.endswith(".msu") for n in lowered) and any(n.endswith(_MSU1_ROM_EXTENSIONS) for n in lowered)
+
+
+def _msu1_launch_file(paths: list[str]) -> str | None:
+    """The ROM of an MSU-1 set: the ``.sfc``/``.smc`` named like the ``.msu``, else the first one."""
+    msu_stems = {os.path.splitext(p)[0].lower() for p in paths if p.lower().endswith(".msu")}
+    if not msu_stems:
+        return None
+    roms = [p for p in paths if p.lower().endswith(_MSU1_ROM_EXTENSIONS)]
+    for rom in roms:
+        if os.path.splitext(rom)[0].lower() in msu_stems:
+            return rom
+    return roms[0] if roms else None
+
+
 def detect_launch_file(files: list[tuple[str, int]], m3u_supported: bool) -> str | None:
     """Pick the best launch file from a list of (path, size) tuples.
 
@@ -146,6 +173,11 @@ def detect_launch_file(files: list[tuple[str, int]], m3u_supported: bool) -> str
         matches = [p for p in paths if p.lower().endswith(ext)]
         if matches:
             return matches[0]
+
+    # MSU-1: the .pcm audio tracks dwarf the ROM, so "largest" would pick a track.
+    msu1_rom = _msu1_launch_file(paths)
+    if msu1_rom is not None:
+        return msu1_rom
 
     # Largest file by pre-computed size
     return max(files, key=lambda t: t[1])[0]

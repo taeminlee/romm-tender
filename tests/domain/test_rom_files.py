@@ -582,3 +582,30 @@ class TestResolveExtractDirName:
 
     def test_missing_fs_name_and_id_uses_unknown_fallback(self):
         assert resolve_extract_dir_name({}) == "rom_unknown"
+
+
+class TestMsu1:
+    def test_holds_msu1_set(self):
+        from domain.rom_files import holds_msu1_set
+
+        assert holds_msu1_set(["Game.sfc", "Game.msu", "Game-1.pcm"])
+        assert holds_msu1_set(["Game/", "Game/Game.SMC", "Game/Game.MSU"])
+        assert not holds_msu1_set(["Game.sfc"])
+        assert not holds_msu1_set(["Game.msu", "Game-1.pcm"])
+
+    def test_launch_file_is_the_rom_not_the_largest_track(self):
+        files = [
+            ("/r/Game.sfc", 4_000_000),
+            ("/r/Game.msu", 0),
+            ("/r/Game-1.pcm", 90_000_000),
+            ("/r/manifest.bml", 6_000),
+        ]
+        assert detect_launch_file(files, m3u_supported=False) == "/r/Game.sfc"
+
+    def test_launch_file_prefers_the_rom_named_like_the_msu(self):
+        files = [("/r/Other.sfc", 10), ("/r/Game.sfc", 10), ("/r/Game.msu", 0), ("/r/Game-1.pcm", 999)]
+        assert detect_launch_file(files, m3u_supported=False) == "/r/Game.sfc"
+
+    def test_no_msu_keeps_largest_rule(self):
+        files = [("/r/a.bin", 10), ("/r/b.bin", 99)]
+        assert detect_launch_file(files, m3u_supported=False) == "/r/b.bin"

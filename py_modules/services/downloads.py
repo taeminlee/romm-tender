@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import zipfile
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -23,6 +24,7 @@ from domain.rom_files import (
     detect_launch_file,
     es_de_collapse_rename,
     folder_boot_layout_root,
+    holds_msu1_set,
     is_multi_file_download,
     needs_m3u,
     resolve_extract_dir_name,
@@ -629,6 +631,19 @@ class DownloadService:
         and nothing is persisted — otherwise ``None``.
         """
         tmp_path = target_path + _TMP_EXT
+        # An MSU-1 zip is unpacked like a multi-file ROM: RetroArch would extract
+        # only the .sfc from it, leaving the .msu/.pcm audio behind.
+        if target_path.lower().endswith(".zip") and holds_msu1_set(self._zip_member_names(tmp_path)):
+            self._download_file_store.rename(tmp_path, target_path + _ZIP_TMP_EXT)
+            self._logger.info(f"MSU-1 set in {os.path.basename(target_path)}: unpacking it into a folder")
+            return self._post_download_multi_io(
+                rom_id,
+                rom_detail,
+                target_path,
+                os.path.basename(target_path),
+                system,
+                self._resolve_safe_extract_dir_name(rom_detail),
+            )
         self._download_file_store.rename(tmp_path, target_path)
 
         return self._install_recorder.do_record_install(
@@ -639,6 +654,15 @@ class DownloadService:
             system=system,
             cleanup=lambda: self._download_file_store.remove_file(target_path),
         )
+
+    @staticmethod
+    def _zip_member_names(path: str) -> list[str]:
+        """The member names of the zip at *path*, or ``[]`` when it does not open as a zip."""
+        try:
+            with zipfile.ZipFile(path) as archive:
+                return archive.namelist()
+        except (OSError, zipfile.BadZipFile):
+            return []
 
     def _make_progress_callback(self, rom_id, rom_name, platform_name, file_name, control=None):
         """Build a throttled progress callback for a download."""

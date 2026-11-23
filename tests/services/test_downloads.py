@@ -1999,6 +1999,109 @@ class TestDoDownloadMultiFile:
         assert plugin._download_service._download_queue[99]["status"] == "completed"
 
     @pytest.mark.asyncio
+    async def test_single_msu1_zip_is_unpacked_and_launches_the_sfc(self, plugin, tmp_path):
+        """A single zip holding an MSU-1 set is unpacked: RetroArch would extract only the .sfc."""
+        import zipfile as zf
+        from unittest.mock import patch
+
+        import decky
+
+        decky.DECKY_USER_HOME = str(tmp_path)
+        plugin._download_service._retrodeck_paths = FakeRetroDeckPaths(
+            roms=str(tmp_path / "retrodeck" / "roms"),
+            bios=str(tmp_path / "retrodeck" / "bios"),
+        )
+        decky.emit.reset_mock()
+
+        roms_dir = tmp_path / "retrodeck" / "roms" / "snes"
+        roms_dir.mkdir(parents=True)
+        target_path = str(roms_dir / "Game_MSU1.zip")
+
+        zip_content_path = tmp_path / "source.zip"
+        with zf.ZipFile(str(zip_content_path), "w") as z:
+            z.writestr("Game_MSU1.sfc", b"\x00" * 100)
+            z.writestr("Game_MSU1.msu", b"")
+            z.writestr("Game_MSU1-1.pcm", b"\x00" * 5000)
+            z.writestr("Game_MSU1-2.pcm", b"\x00" * 5000)
+        zip_bytes = zip_content_path.read_bytes()
+
+        rom_detail = {
+            "id": 77,
+            "name": "Game",
+            "fs_name": "Game_MSU1.zip",
+            "fs_name_no_ext": "Game_MSU1",
+            "platform_slug": "snes",
+            "platform_name": "Super Nintendo",
+            "has_multiple_files": False,
+            "files": [{"file_name": "Game_MSU1.zip"}],
+        }
+
+        def fake_download(_rom_id, _filename, dest, _progress_callback=None, *, resume=False, on_meta=None):
+            with open(dest, "wb") as f:
+                f.write(zip_bytes)
+
+        _seed_rom(plugin._uow, 77, platform_slug="snes")
+        plugin._download_service._loop = asyncio.get_running_loop()
+        plugin._download_service._download_queue[77] = {"rom_id": 77, "status": "downloading", "progress": 0}
+
+        with patch.object(plugin._romm_api, "download_rom_content", side_effect=fake_download):
+            await plugin._download_service._do_download(77, rom_detail, target_path, "snes", "Game_MSU1.zip")
+
+        installed = plugin._uow.rom_installs.get(77)
+        assert installed is not None
+        assert installed.rom_dir is not None
+        rom_dir = installed.rom_dir
+        assert installed.file_path == os.path.join(rom_dir, "Game_MSU1.sfc")
+        for name in ("Game_MSU1.sfc", "Game_MSU1.msu", "Game_MSU1-1.pcm", "Game_MSU1-2.pcm"):
+            assert os.path.isfile(os.path.join(rom_dir, name))
+        assert not os.path.isfile(target_path)
+        assert not os.path.exists(target_path + ".zip.tmp")
+        assert not os.path.exists(target_path + ".tmp")
+        assert plugin._download_service._download_queue[77]["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_single_plain_zip_is_kept_as_it_is(self, plugin, tmp_path):
+        """A zip without an MSU-1 set stays a single file, as before."""
+        import zipfile as zf
+        from unittest.mock import patch
+
+        import decky
+
+        decky.DECKY_USER_HOME = str(tmp_path)
+        plugin._download_service._retrodeck_paths = FakeRetroDeckPaths(
+            roms=str(tmp_path / "retrodeck" / "roms"),
+            bios=str(tmp_path / "retrodeck" / "bios"),
+        )
+        roms_dir = tmp_path / "retrodeck" / "roms" / "snes"
+        roms_dir.mkdir(parents=True)
+        target_path = str(roms_dir / "Plain.zip")
+        zip_content_path = tmp_path / "plain.zip"
+        with zf.ZipFile(str(zip_content_path), "w") as z:
+            z.writestr("Plain.sfc", b"\x00" * 100)
+        zip_bytes = zip_content_path.read_bytes()
+        rom_detail = {
+            "id": 78, "name": "Plain", "fs_name": "Plain.zip", "fs_name_no_ext": "Plain",
+            "platform_slug": "snes", "platform_name": "Super Nintendo",
+            "has_multiple_files": False, "files": [{"file_name": "Plain.zip"}],
+        }
+
+        def fake_download(_rom_id, _filename, dest, _progress_callback=None, *, resume=False, on_meta=None):
+            with open(dest, "wb") as f:
+                f.write(zip_bytes)
+
+        _seed_rom(plugin._uow, 78, platform_slug="snes")
+        plugin._download_service._loop = asyncio.get_running_loop()
+        plugin._download_service._download_queue[78] = {"rom_id": 78, "status": "downloading", "progress": 0}
+        with patch.object(plugin._romm_api, "download_rom_content", side_effect=fake_download):
+            await plugin._download_service._do_download(78, rom_detail, target_path, "snes", "Plain.zip")
+
+        installed = plugin._uow.rom_installs.get(78)
+        assert installed is not None
+        assert installed.rom_dir is None
+        assert installed.file_path == target_path
+        assert os.path.isfile(target_path)
+
+    @pytest.mark.asyncio
     async def test_nested_multi_file_cleanup_removes_extract_dir(self, plugin, tmp_path):
         """#855: a nested-multi download failure must remove the extract dir.
 
