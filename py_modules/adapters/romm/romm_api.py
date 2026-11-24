@@ -401,6 +401,14 @@ class RommApiAdapter:
     def ingest_play_sessions(self, device_id: str, sessions: list[PlaySessionIngestEntry]) -> PlaySessionIngestResponse:
         return self._client.post_json("/api/play-sessions", {"device_id": device_id, "sessions": sessions})
 
+    # ── Live activity ("now playing", RomM /api/activity) ─────────────
+
+    def post_activity_heartbeat(self, rom_id: int, device_id: str) -> dict[str, Any]:
+        return self._client.post_json("/api/activity/heartbeat", {"rom_id": int(rom_id), "device_id": device_id})
+
+    def clear_activity(self, device_id: str) -> None:
+        self._client.delete(f"/api/activity/heartbeat?device_id={urllib.parse.quote(device_id, safe='')}")
+
     def list_play_sessions(self, rom_id: int, limit: int = 100) -> list[dict[str, Any]]:
         """Fetch every stored play-session row for a ROM, paginating on ``offset``.
 

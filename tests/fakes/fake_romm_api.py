@@ -162,6 +162,8 @@ class FakeRommApi:
         self.download_cover_from_url_side_effect: Exception | None = None
         self.get_current_user_side_effect: Exception | None = None
         self.ingest_play_sessions_side_effect: Exception | None = None
+        self.post_activity_heartbeat_side_effect: Exception | None = None
+        self.clear_activity_side_effect: Exception | None = None
         self.list_play_sessions_side_effect: Exception | None = None
         self.register_device_side_effect: Exception | None = None
         self.list_devices_side_effect: Exception | None = None
@@ -479,6 +481,15 @@ class FakeRommApi:
     # ------------------------------------------------------------------
     # RommPlaytimeApi (native play-session ingest, ADR-0018)
     # ------------------------------------------------------------------
+
+    def post_activity_heartbeat(self, rom_id: int, device_id: str) -> dict[str, Any]:
+        self._log("post_activity_heartbeat", (rom_id, device_id))
+        self._check_fail(self.post_activity_heartbeat_side_effect)
+        return {"rom_id": rom_id, "device_id": device_id}
+
+    def clear_activity(self, device_id: str) -> None:
+        self._log("clear_activity", (device_id,))
+        self._check_fail(self.clear_activity_side_effect)
 
     def ingest_play_sessions(self, device_id: str, sessions: list[PlaySessionIngestEntry]) -> PlaySessionIngestResponse:
         self._log("ingest_play_sessions", (device_id, sessions))

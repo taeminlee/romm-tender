@@ -125,6 +125,17 @@ class RommPlaytimeApi(Protocol):
         """
         ...
 
+    def post_activity_heartbeat(self, rom_id: int, device_id: str) -> dict[str, Any]:
+        """Report "now playing" for this device (POST /api/activity/heartbeat).
+
+        RomM keeps the entry for ~90 s, so the caller repeats it while the game runs.
+        """
+        ...
+
+    def clear_activity(self, device_id: str) -> None:
+        """Clear this device's "now playing" entry at once (DELETE /api/activity/heartbeat)."""
+        ...
+
     def list_play_sessions(self, rom_id: int, limit: int = 100) -> list[dict[str, Any]]:
         """Fetch stored play-session rows for a ROM (needs the ``roms.user.read`` scope).
 

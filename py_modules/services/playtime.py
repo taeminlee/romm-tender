@@ -14,6 +14,8 @@ communication goes through ``RommPlaytimeApi``. No ``import decky``.
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import sqlite3
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -54,6 +56,11 @@ _FLUSH_BATCH_LIMIT = 100
 # quarantined (dropped — only playtime is lost) once it reaches this many
 # failures, so one permanently-rejected session cannot wedge the whole outbox.
 _MAX_INGEST_ATTEMPTS = 5
+
+# "Now playing" heartbeat to RomM (/api/activity/heartbeat). RomM drops an entry
+# that is not refreshed within ~90 s, so 30 s leaves room for two misses. A
+# suspended device simply stops beating and the entry expires on its own.
+_ACTIVITY_HEARTBEAT_SEC = 30
 
 # Durable ``kv_config`` flag: set when a reconcile GET 403s (the token lacks the
 # ``roms.user.read`` scope), cleared on a later 200 or a fresh sign-in. The QAM
@@ -127,6 +134,8 @@ class PlaytimeService:
         self._clock = config.clock
         self._log_debug = config.log_debug
         self._uow_factory = config.uow_factory
+        # (rom_id, device_id, future of the heartbeat loop) while a game runs
+        self._activity: tuple[int, str, concurrent.futures.Future[None]] | None = None
 
     # ------------------------------------------------------------------
     # Session recording
@@ -149,7 +158,56 @@ class PlaytimeService:
         except sqlite3.IntegrityError as e:
             self._log_debug(f"Failed to record session start for rom {rid}: {e}")
             return {"success": False, "reason": "unknown_rom", "message": "Unknown ROM"}
+        self._start_activity(rid)
         return {"success": True}
+
+    # ------------------------------------------------------------------
+    # Live activity ("now playing" on RomM, best-effort)
+    # ------------------------------------------------------------------
+
+    def _start_activity(self, rom_id: int) -> None:
+        """Begin reporting ``rom_id`` as playing on this device until the session ends.
+
+        Best-effort and never raising: an unregistered device (no id) or an
+        unreachable server only means RomM does not show the game as live.
+        """
+        try:
+            device_id = self._device_id_provider.get_device_id()
+        except Exception as e:  # pragma: no cover - defensive, provider is local
+            self._log_debug(f"activity: device id unavailable: {e}")
+            return
+        if not device_id:
+            return
+        self._cancel_activity()
+        future = asyncio.run_coroutine_threadsafe(self._activity_loop(rom_id, device_id), self._loop)
+        self._activity = (rom_id, device_id, future)
+
+    async def _activity_loop(self, rom_id: int, device_id: str) -> None:
+        while True:
+            try:
+                await self._loop.run_in_executor(None, self._romm_api.post_activity_heartbeat, rom_id, device_id)
+            except Exception as e:
+                self._log_debug(f"activity heartbeat failed for rom {rom_id} (non-fatal): {e}")
+            await asyncio.sleep(_ACTIVITY_HEARTBEAT_SEC)
+
+    def _cancel_activity(self) -> str | None:
+        """Stop the heartbeat loop; return the device id it was reporting for."""
+        if self._activity is None:
+            return None
+        _rom_id, device_id, future = self._activity
+        self._activity = None
+        future.cancel()
+        return device_id
+
+    def stop_activity(self) -> None:
+        """Stop reporting and clear the "now playing" entry on RomM (session end / unload)."""
+        device_id = self._cancel_activity()
+        if device_id is None:
+            return
+        try:
+            self._romm_api.clear_activity(device_id)
+        except Exception as e:
+            self._log_debug(f"activity clear failed (non-fatal, expires on its own): {e}")
 
     async def record_session_end(self, rom_id: int) -> dict[str, Any]:
         """Record end of play session, accumulate playtime delta.
@@ -163,6 +221,8 @@ class PlaytimeService:
         connection has thread affinity), then the native ingest flush runs
         best-effort outside any transaction.
         """
+        if self._activity is not None and self._activity[0] == int(rom_id):
+            await self._loop.run_in_executor(None, self.stop_activity)
         return await self._loop.run_in_executor(None, self._record_session_end_io, int(rom_id))
 
     def _record_session_end_io(self, rom_id: int) -> dict[str, Any]:

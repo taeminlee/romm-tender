@@ -678,6 +678,13 @@ class FakeSaveApi:
     # RommPlaytimeApi (native play-session ingest, ADR-0018)
     # ------------------------------------------------------------------
 
+    def post_activity_heartbeat(self, rom_id: int, device_id: str) -> dict[str, Any]:
+        self.call_log.append(("post_activity_heartbeat", (rom_id, device_id), {}))
+        return {"rom_id": rom_id, "device_id": device_id}
+
+    def clear_activity(self, device_id: str) -> None:
+        self.call_log.append(("clear_activity", (device_id,), {}))
+
     def ingest_play_sessions(self, device_id: str, sessions: list[PlaySessionIngestEntry]) -> PlaySessionIngestResponse:
         self.call_log.append(("ingest_play_sessions", (device_id, sessions), {}))
         self._check_fail()

@@ -216,6 +216,9 @@ class Plugin:
         await self._migration_service.shutdown()
         await self._session_lifecycle_service.shutdown()
         await self._cancel_playtime_flush_tasks()
+        playtime = getattr(self, "_playtime_service", None)
+        if playtime is not None:
+            await asyncio.get_running_loop().run_in_executor(None, playtime.stop_activity)
         decky.logger.info("Tender pluginunloaded")
 
     async def _cancel_playtime_flush_tasks(self):

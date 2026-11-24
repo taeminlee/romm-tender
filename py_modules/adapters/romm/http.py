@@ -849,6 +849,25 @@ class RommHttpAdapter:
         """PUT JSON to RomM API, return parsed response."""
         return self.json_request(path, data, method="PUT")
 
+    def delete(self, path: str) -> None:
+        """DELETE on the RomM API; the response body (often an empty 204) is ignored."""
+        url = self._settings["romm_url"].rstrip("/") + path
+
+        def _do_delete() -> None:
+            req = urllib.request.Request(url, method="DELETE")
+            self._apply_default_headers(req)
+            try:
+                with self._urlopen(req, timeout=30) as resp:
+                    resp.read()
+            except RommApiError:
+                raise
+            except urllib.error.HTTPError as exc:
+                raise self._translate_with_detail(exc, url, "DELETE") from exc
+            except Exception as exc:
+                raise self.translate_http_error(exc, url, "DELETE") from exc
+
+        self.with_retry(_do_delete)
+
     # Intentionally skips with_retry: POST uploads may not be idempotent.
     # (RomM saves endpoint upserts by filename, but we err on the side of caution.)
     def upload_multipart(self, path: str, file_path: str, method: str = "POST"):

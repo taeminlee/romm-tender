@@ -1669,3 +1669,74 @@ class TestScopeNotice:
     def test_get_scope_notice_default_is_not_pending(self):
         svc, _, _ = make_service()
         assert svc.get_scope_notice() == {"pending": False}
+
+
+# ---------------------------------------------------------------------------
+# Live activity ("now playing" heartbeat to RomM)
+# ---------------------------------------------------------------------------
+
+
+def _calls(fake, name):
+    return [c[1] for c in fake.call_log if c[0] == name]
+
+
+class TestActivityHeartbeat:
+    @pytest.mark.asyncio
+    async def test_start_reports_now_playing_and_end_clears_it(self):
+        import asyncio
+
+        svc, fake, uow = make_service()
+        _seed_rom(uow, 42)
+        svc.record_session_start(42)
+        for _ in range(50):
+            await asyncio.sleep(0.01)
+            if _calls(fake, "post_activity_heartbeat"):
+                break
+        assert _calls(fake, "post_activity_heartbeat") == [(42, "device-1")]
+        await svc.record_session_end(42)
+        assert _calls(fake, "clear_activity") == [("device-1",)]
+        assert svc._activity is None
+
+    @pytest.mark.asyncio
+    async def test_unregistered_device_sends_nothing(self):
+        import asyncio
+
+        svc, fake, uow = make_service(device_id=None)
+        _seed_rom(uow, 42)
+        svc.record_session_start(42)
+        await asyncio.sleep(0.05)
+        await svc.record_session_end(42)
+        assert _calls(fake, "post_activity_heartbeat") == []
+        assert _calls(fake, "clear_activity") == []
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_failure_is_not_fatal(self):
+        import asyncio
+
+        fake = FakeRommApi()
+        fake.post_activity_heartbeat_side_effect = RommConnectionError("offline")
+        fake.clear_activity_side_effect = RommConnectionError("offline")
+        svc, fake, uow = make_service(fake_api=fake)
+        _seed_rom(uow, 42)
+        assert svc.record_session_start(42) == {"success": True}
+        await asyncio.sleep(0.05)
+        result = await svc.record_session_end(42)
+        assert result["success"] is True
+        assert svc._activity is None
+
+    @pytest.mark.asyncio
+    async def test_new_session_replaces_previous_heartbeat(self):
+        import asyncio
+
+        svc, fake, uow = make_service()
+        _seed_rom(uow, 1)
+        _seed_rom(uow, 2)
+        svc.record_session_start(1)
+        await asyncio.sleep(0.05)
+        first = svc._activity[2]
+        svc.record_session_start(2)
+        await asyncio.sleep(0.05)
+        assert first.cancelled()
+        assert svc._activity[0] == 2
+        svc.stop_activity()
+        assert _calls(fake, "clear_activity") == [("device-1",)]
