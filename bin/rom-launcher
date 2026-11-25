@@ -4,14 +4,14 @@
 # path) in the shortcut's launch options. Pure exec wrapper: it runs exactly
 # what it is handed and owns no state, no path resolution, no emulator knowledge.
 #
-# Fork addition (0.33.1-msu3): frame generation via decky-lsfg-vk.
+# Fork addition (0.33.1-msu3, default changed in -msu4): frame generation via decky-lsfg-vk.
 # When the decky-lsfg-vk launch script (~/lsfg) exists, games whose ROM sits in
 # one of the chosen RetroDECK system folders (…/roms/<system>/…) are started
 # through it, so no shortcut has to be edited by hand. The systems are read
 # from ~/.config/romm-tender/lsfg-systems (names separated by spaces or lines,
 # `#` starts a comment, `*` means every system; an empty file turns it off).
-# Without that file the default is the systems whose games mostly run at
-# 30 fps: ps2 gc wii wiiu n3ds ps3 switch.
+# Without that file every system is started through it (on a 90 Hz Deck even
+# 60 fps games gain from frame generation).
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ fi
 
 lsfg_script="${HOME:-}/lsfg"
 lsfg_conf="${XDG_CONFIG_HOME:-${HOME:-}/.config}/romm-tender/lsfg-systems"
-lsfg_default="ps2 gc wii wiiu n3ds ps3 switch"
+lsfg_default="*"
 
 lsfg_wanted() {
     [[ -n ${HOME:-} && -x $lsfg_script && ! -d $lsfg_script ]] || return 1
