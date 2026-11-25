@@ -32,6 +32,7 @@ import { DownloadProgressRow } from "./DownloadProgressRow";
 import { MigrationBlockedPage } from "./MigrationBlockedPage";
 import { SettingsResetBanner } from "./SettingsResetBanner";
 import { LegacyInstallNotice } from "./LegacyInstallBanner";
+import { ForkUpdateBanner } from "./ForkUpdateBanner";
 import { DataLocationNotice } from "./DataLocationNotice";
 import { PlaytimeScopeBanner } from "./PlaytimeScopeBanner";
 import type { SyncPreview, SyncProgress, SyncRunKind, SyncStats, NavTarget } from "../types";
@@ -574,6 +575,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
 
   return (
     <>
+      <ForkUpdateBanner />
       <LegacyInstallNotice />
       {settingsReset.pending && <SettingsResetBanner backedUpTo={settingsReset.backedUpTo} />}
       {playtimeScope.pending && (
