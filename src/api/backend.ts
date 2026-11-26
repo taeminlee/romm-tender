@@ -953,6 +953,10 @@ export const logError = (msg: string) => {
 export const fixRetroarchInputDriver = callable<[], { success: boolean; message: string }>(
   "fix_retroarch_input_driver",
 );
+// Fork addition (0.33.1-msu6): the RomM server's RetroArch shader bundle (py_modules/fork_shaders.py).
+export type ForkShaderResult =
+  { success: true; shader_dir: string; presets: string[] } | { success: false; reason: string; message: string };
+export const installForkShaders = callable<[], ForkShaderResult>("install_fork_shaders");
 export const getRomMetadata = callable<[number], RomMetadata>("get_rom_metadata");
 export const getMetadataCachePage = callable<[number, number], { items: Record<string, RomMetadata>; total: number }>(
   "get_metadata_cache_page",

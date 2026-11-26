@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(plugin_dir, "py_modules"))
 sys.path.insert(0, plugin_dir)
 
 import decky
+import fork_shaders
 from bootstrap import (
     RuntimeBundle,
     WiringConfig,
@@ -16,6 +17,7 @@ from bootstrap import (
     wire_services,
 )
 
+from domain.custom_headers import stored_custom_headers
 from lib.migration_gate import migration_blocked
 from lib.prune_gate import (
     acquire_prune_conflict_lease,
@@ -312,6 +314,21 @@ class Plugin:
             "config_path": self._retrodeck_paths.config_path(),
             "resolved_home": self._retrodeck_paths.retrodeck_home(),
         }
+
+    async def install_fork_shaders(self):
+        """Fork addition: install the RomM server's RetroArch shader bundle.
+
+        See ``fork_shaders.install``. Returns ``{success: True, shader_dir,
+        presets}`` or ``{success: False, reason, message}``.
+        """
+        headers = {h.name: h.value for h in stored_custom_headers(self.settings.get("romm_custom_headers"))}
+        return await asyncio.to_thread(
+            fork_shaders.install,
+            str(self.settings.get("romm_url") or ""),
+            bool(self.settings.get("romm_allow_insecure_ssl")),
+            headers,
+            decky.DECKY_USER_HOME,
+        )
 
     async def get_whitelist_settings(self):
         return self._settings_service.get_whitelist_settings()
