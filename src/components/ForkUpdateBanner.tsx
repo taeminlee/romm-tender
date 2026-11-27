@@ -16,7 +16,7 @@ import { useEffect, useState, FC } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem, Field } from "@decky/ui";
 
 /** This build's version; must match plugin.json. */
-export const FORK_VERSION = "0.33.1-msu6";
+export const FORK_VERSION = "0.33.1-msu7";
 const PLUGIN_NAME = "Tender";
 const RELEASES_API = "https://api.github.com/repos/taeminlee/romm-tender/releases?per_page=20";
 const CACHE_KEY = "tender-fork-update";
@@ -53,10 +53,12 @@ export function isNewer(candidate: string, current: string): boolean {
   return false;
 }
 
+/** The newer of this bundle's own version and the one Decky lists. Decky's list can lag behind a
+ *  just-installed update until Steam restarts (msu7 fix), while the bundle constant is always current. */
 function runningVersion(): string {
   try {
     const p = deckyGlobal.DeckyPluginLoader?.plugins?.find((x) => x.name === PLUGIN_NAME);
-    if (p?.version && forkVersionKey(p.version)) return p.version;
+    if (p?.version && forkVersionKey(p.version) && isNewer(p.version, FORK_VERSION)) return p.version;
   } catch {
     /* fall back */
   }
@@ -108,7 +110,7 @@ async function fetchNewest(): Promise<ForkRelease | null> {
 
 export const ForkUpdateBanner: FC = () => {
   const [rel, setRel] = useState<ForkRelease | null>(null);
-  const [state, setState] = useState<"idle" | "asking" | "failed">("idle");
+  const [state, setState] = useState<"idle" | "asking" | "done" | "failed">("idle");
   const current = runningVersion();
 
   useEffect(() => {
@@ -144,7 +146,8 @@ export const ForkUpdateBanner: FC = () => {
         rel.sha256,
         INSTALL_TYPE_UPDATE,
       );
-      setState("idle");
+      // Decky has replaced the files; the panel may keep showing the old build until Steam restarts.
+      setState("done");
     } catch {
       setState("failed");
     }
@@ -158,6 +161,8 @@ export const ForkUpdateBanner: FC = () => {
           description={
             state === "failed"
               ? "업데이트를 시작하지 못했습니다. Decky › 개발자 › URL 로 설치를 써 주세요."
+              : state === "done"
+              ? "설치를 요청했습니다. 확인 후 버전이 그대로 보이면 Steam 을 다시 시작하세요."
               : `지금 ${current}. 누르면 Decky 가 확인 후 설치하고 다시 불러옵니다.`
           }
           focusable={true}
@@ -165,8 +170,8 @@ export const ForkUpdateBanner: FC = () => {
         />
       </PanelSectionRow>
       <PanelSectionRow>
-        <ButtonItem layout="below" bottomSeparator="none" disabled={state === "asking"} onClick={() => void install()}>
-          {state === "asking" ? "Decky 확인 창을 확인하세요…" : "업데이트"}
+        <ButtonItem layout="below" bottomSeparator="none" disabled={state === "asking" || state === "done"} onClick={() => void install()}>
+          {state === "asking" ? "Decky 확인 창을 확인하세요…" : state === "done" ? "설치 요청됨" : "업데이트"}
         </ButtonItem>
       </PanelSectionRow>
     </PanelSection>
