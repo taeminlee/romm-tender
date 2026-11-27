@@ -70,6 +70,7 @@ import { ControllerSection } from "./settings/ControllerSection";
 import { AdvancedSection } from "./settings/AdvancedSection";
 import { ForkShaderInstall } from "./ForkShaderInstall";
 import { ForkLsfgSystems } from "./ForkLsfgSystems";
+import { ForkForceUpdate } from "./ForkForceUpdate";
 import { LibrarySection, AUTO_REGION, DEFAULT_REGION_LABEL } from "./settings/LibrarySection";
 import { showPreferredRegionModal } from "./settings/PreferredRegionModal";
 
@@ -669,6 +670,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({ onBack, section }) => {
             <AdvancedSection logLevel={logLevel} onLogLevelChange={handleLogLevelChange} />
             <ForkShaderInstall />
             <ForkLsfgSystems />
+            <ForkForceUpdate />
           </>
         );
     }

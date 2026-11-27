@@ -2,6 +2,7 @@
 
 import io
 import os
+import ssl
 import tarfile
 import urllib.error
 
@@ -128,3 +129,29 @@ def test_shader_dir_follows_retroarch_cfg(tmp_path, line, expected):
     base = {"cfg": cfg_dir, "home": home, "abs": ""}[expected[0]]
     want = expected[1] if expected[0] == "abs" else os.path.join(base, expected[1])
     assert fork_shaders.shader_dir(home) == want
+
+
+def test_download_verifies_with_the_certifi_bundle(monkeypatch):
+    seen = {}
+    real_ctx = ssl.create_default_context
+
+    def fake_ctx(cafile=None):
+        seen["cafile"] = cafile
+        return real_ctx()
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n):
+            return b"data"
+
+    monkeypatch.setattr(fork_shaders.ssl, "create_default_context", fake_ctx)
+    monkeypatch.setattr(fork_shaders, "ca_bundle", lambda: "/certifi/cacert.pem")
+    monkeypatch.setattr(fork_shaders.urllib.request, "urlopen", lambda req, timeout, context: Resp())
+
+    assert fork_shaders._download("https://romm.example/x", False, {}) == b"data"
+    assert seen["cafile"] == "/certifi/cacert.pem"

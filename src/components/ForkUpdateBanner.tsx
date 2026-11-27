@@ -16,14 +16,15 @@ import { useEffect, useState, FC } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem, Field } from "@decky/ui";
 
 /** This build's version; must match plugin.json. */
-export const FORK_VERSION = "0.33.1-msu8";
+export const FORK_VERSION = "0.33.1-msu9";
 const PLUGIN_NAME = "Tender";
 const RELEASES_API = "https://api.github.com/repos/taeminlee/romm-tender/releases?per_page=20";
 const CACHE_KEY = "tender-fork-update";
 const CACHE_MS = 6 * 60 * 60 * 1000;
-const INSTALL_TYPE_UPDATE = 2; // decky-loader InstallType.UPDATE
+export const INSTALL_TYPE_REINSTALL = 1; // decky-loader InstallType.REINSTALL
+export const INSTALL_TYPE_UPDATE = 2; // decky-loader InstallType.UPDATE
 
-interface ForkRelease {
+export interface ForkRelease {
   version: string;
   url: string;
   sha256: string;
@@ -55,7 +56,7 @@ export function isNewer(candidate: string, current: string): boolean {
 
 /** The newer of this bundle's own version and the one Decky lists. Decky's list can lag behind a
  *  just-installed update until Steam restarts (msu7 fix), while the bundle constant is always current. */
-function runningVersion(): string {
+export function runningVersion(): string {
   try {
     const p = deckyGlobal.DeckyPluginLoader?.plugins?.find((x) => x.name === PLUGIN_NAME);
     if (p?.version && forkVersionKey(p.version) && isNewer(p.version, FORK_VERSION)) return p.version;
@@ -77,9 +78,10 @@ interface GhRelease {
   assets: GhAsset[];
 }
 
-async function fetchNewest(): Promise<ForkRelease | null> {
+/** Newest fork release on GitHub; `force` skips the six-hour cache (Settings › Advanced button). */
+export async function fetchNewest(force = false): Promise<ForkRelease | null> {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = force ? null : localStorage.getItem(CACHE_KEY);
     if (raw) {
       const c = JSON.parse(raw) as { at: number; rel: ForkRelease | null };
       if (Date.now() - c.at < CACHE_MS) return c.rel;
@@ -108,6 +110,14 @@ async function fetchNewest(): Promise<ForkRelease | null> {
   return best;
 }
 
+/** Hand a release zip to Decky's own installer (confirmation, hash check, reload). */
+export async function installRelease(rel: ForkRelease, installType: number): Promise<boolean> {
+  const backend = deckyGlobal.DeckyBackend;
+  if (!backend) return false;
+  await backend.call("utilities/install_plugin", rel.url, PLUGIN_NAME, rel.version, rel.sha256, installType);
+  return true;
+}
+
 export const ForkUpdateBanner: FC = () => {
   const [rel, setRel] = useState<ForkRelease | null>(null);
   const [state, setState] = useState<"idle" | "asking" | "done" | "failed">("idle");
@@ -130,22 +140,13 @@ export const ForkUpdateBanner: FC = () => {
   if (!rel) return null;
 
   const install = async () => {
-    const backend = deckyGlobal.DeckyBackend;
-    if (!backend) {
-      setState("failed");
-      return;
-    }
     setState("asking");
     try {
       // Decky asks for confirmation, downloads, checks the hash and reloads the plugin.
-      await backend.call(
-        "utilities/install_plugin",
-        rel.url,
-        PLUGIN_NAME,
-        rel.version,
-        rel.sha256,
-        INSTALL_TYPE_UPDATE,
-      );
+      if (!(await installRelease(rel, INSTALL_TYPE_UPDATE))) {
+        setState("failed");
+        return;
+      }
       // Decky has replaced the files; the panel may keep showing the old build until Steam restarts.
       setState("done");
     } catch {

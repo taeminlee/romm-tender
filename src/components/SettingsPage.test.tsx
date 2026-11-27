@@ -95,6 +95,9 @@ vi.mock("./settings/AdvancedSection", () => ({
 vi.mock("./ForkLsfgSystems", () => ({
   ForkLsfgSystems: () => createElement("div", { "data-testid": "fork-lsfg" }),
 }));
+vi.mock("./ForkForceUpdate", () => ({
+  ForkForceUpdate: () => createElement("div", { "data-testid": "fork-force-update" }),
+}));
 vi.mock("./settings/LibrarySection", async (importOriginal) => {
   // Keep the real AUTO_REGION / DEFAULT_REGION_LABEL constants (SettingsPage
   // imports them), but stub the component to capture props.

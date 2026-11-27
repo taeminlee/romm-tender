@@ -30,6 +30,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from lib.certifi_bundle import ca_bundle
+
 BUNDLE_PATH = "/hb/deck/deck-shaders.tar.gz"
 MAX_BYTES = 64 * 1024 * 1024
 TOP_DIRS = ("guest", "hb-upscale", "real-crt-phosphor")
@@ -72,7 +74,8 @@ def shader_dir(user_home: str) -> str | None:
 
 def _download(url: str, insecure: bool, headers: dict[str, str]) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "Tender", **headers})
-    ctx = ssl.create_default_context()
+    # Decky's Python has no system CA store; use the certifi bundle like the RomM client (msu9 fix).
+    ctx = ssl.create_default_context(cafile=ca_bundle())
     if insecure:  # the user's own "allow insecure SSL" server setting
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
