@@ -16,7 +16,7 @@ import { useEffect, useState, FC } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem, Field } from "@decky/ui";
 
 /** This build's version; must match plugin.json. */
-export const FORK_VERSION = "0.33.1-msu7";
+export const FORK_VERSION = "0.33.1-msu8";
 const PLUGIN_NAME = "Tender";
 const RELEASES_API = "https://api.github.com/repos/taeminlee/romm-tender/releases?per_page=20";
 const CACHE_KEY = "tender-fork-update";

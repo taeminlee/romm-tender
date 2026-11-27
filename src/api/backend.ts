@@ -957,6 +957,11 @@ export const fixRetroarchInputDriver = callable<[], { success: boolean; message:
 export type ForkShaderResult =
   { success: true; shader_dir: string; presets: string[] } | { success: false; reason: string; message: string };
 export const installForkShaders = callable<[], ForkShaderResult>("install_fork_shaders");
+// Fork addition (0.33.1-msu8): per-system frame generation switches (py_modules/fork_lsfg.py).
+export type ForkLsfgStatus = { available: boolean; all: boolean; systems: { name: string; enabled: boolean }[] };
+export type ForkLsfgSetResult = { success: true; enabled: boolean } | { success: false; reason: string; message: string };
+export const getForkLsfg = callable<[], ForkLsfgStatus>("get_fork_lsfg");
+export const setForkLsfg = callable<[string, boolean], ForkLsfgSetResult>("set_fork_lsfg");
 export const getRomMetadata = callable<[number], RomMetadata>("get_rom_metadata");
 export const getMetadataCachePage = callable<[number, number], { items: Record<string, RomMetadata>; total: number }>(
   "get_metadata_cache_page",

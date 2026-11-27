@@ -891,6 +891,8 @@ _MIGRATION_BLOCKED_WHITELIST: set[str] = {
     "apply_steam_input_setting",
     "fix_retroarch_input_driver",
     "install_fork_shaders",  # fork addition: writes RetroArch shader folders only, no plugin data
+    "get_fork_lsfg",  # fork addition: reads ~/.config/romm-tender/lsfg-systems and the ROM folder
+    "set_fork_lsfg",  # fork addition: writes ~/.config/romm-tender/lsfg-systems only, no plugin data
     # Read-only library / sync state queries.
     "get_cached_game_detail",
     "get_platform_core_info",

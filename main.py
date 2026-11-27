@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(plugin_dir, "py_modules"))
 sys.path.insert(0, plugin_dir)
 
 import decky
+import fork_lsfg
 import fork_shaders
 from bootstrap import (
     RuntimeBundle,
@@ -329,6 +330,16 @@ class Plugin:
             headers,
             decky.DECKY_USER_HOME,
         )
+
+    async def get_fork_lsfg(self):
+        """Fork addition: per-system frame generation switches (see ``fork_lsfg``)."""
+        return await asyncio.to_thread(
+            fork_lsfg.status, decky.DECKY_USER_HOME, self._retrodeck_paths.roms_path()
+        )
+
+    async def set_fork_lsfg(self, system, enabled):
+        """Fork addition: turn frame generation on or off for one RetroDECK system."""
+        return await asyncio.to_thread(fork_lsfg.set_system, decky.DECKY_USER_HOME, system, bool(enabled))
 
     async def get_whitelist_settings(self):
         return self._settings_service.get_whitelist_settings()

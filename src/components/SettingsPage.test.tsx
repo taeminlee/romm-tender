@@ -91,6 +91,10 @@ vi.mock("./settings/AdvancedSection", () => ({
     return createElement("div", { "data-testid": "advanced-section" });
   },
 }));
+// Fork addition (msu8): the lsfg switches call the backend on mount; they have their own module.
+vi.mock("./ForkLsfgSystems", () => ({
+  ForkLsfgSystems: () => createElement("div", { "data-testid": "fork-lsfg" }),
+}));
 vi.mock("./settings/LibrarySection", async (importOriginal) => {
   // Keep the real AUTO_REGION / DEFAULT_REGION_LABEL constants (SettingsPage
   // imports them), but stub the component to capture props.

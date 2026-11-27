@@ -12,6 +12,9 @@
 # `#` starts a comment, `*` means every system; an empty file turns it off).
 # Without that file every system is started through it (on a 90 Hz Deck even
 # 60 fps games gain from frame generation).
+# Since 0.33.1-msu8 a name prefixed with `-` (e.g. `-pc98`) is never started
+# through it, whatever else the file says; Tender's Settings › Advanced
+# writes this file from its per-system switches.
 
 set -euo pipefail
 
@@ -36,6 +39,13 @@ lsfg_wanted() {
     read -r -a list <<<"$systems"   # no glob expansion, so `*` stays literal
     local system arg
     for system in "${list[@]}"; do
+        [[ $system == -?* ]] || continue
+        for arg in "$@"; do
+            [[ $arg == *"/roms/${system#-}/"* ]] && return 1
+        done
+    done
+    for system in "${list[@]}"; do
+        [[ $system == -* ]] && continue
         [[ $system == "*" ]] && return 0
         for arg in "$@"; do
             [[ $arg == *"/roms/$system/"* ]] && return 0
